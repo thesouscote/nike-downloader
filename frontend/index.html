@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nike Image Downloader</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & Variables ─────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --black:   #0a0a0a;
+      --white:   #f5f5f0;
+      --grey:    #1a1a1a;
+      --mid:     #2a2a2a;
+      --border:  #333;
+      --accent:  #e8ff00;       /* jaune Nike */
+      --text:    #a0a0a0;
+      --green:   #00e676;
+      --red:     #ff1744;
+      --radius:  4px;
+      --font-display: 'Bebas Neue', sans-serif;
+      --font-body:    'DM Sans', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--black);
+      color: var(--white);
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Grain overlay ─────────────────────────────── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 0;
+      opacity: .5;
+    }
+
+    /* ── Layout ────────────────────────────────────── */
+    .wrap {
+      position: relative;
+      z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* ── Header ────────────────────────────────────── */
+    header {
+      padding: 64px 0 48px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-row {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .swoosh {
+      width: 44px;
+      fill: var(--accent);
+      flex-shrink: 0;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(42px, 8vw, 80px);
+      letter-spacing: .04em;
+      line-height: 1;
+      color: var(--white);
+    }
+
+    h1 span { color: var(--accent); }
+
+    .subtitle {
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 300;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      margin-top: 8px;
+    }
+
+    /* ── Input section ─────────────────────────────── */
+    .input-section {
+      padding: 48px 0 32px;
+    }
+
+    .label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--text);
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    input[type="url"] {
+      flex: 1;
+      background: var(--grey);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--white);
+      font-family: var(--font-body);
+      font-size: 14px;
+      padding: 14px 18px;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    input[type="url"]:focus {
+      border-color: var(--accent);
+    }
+
+    input[type="url"]::placeholder { color: #555; }
+
+    .btn {
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: var(--black);
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 18px;
+      letter-spacing: .06em;
+      padding: 14px 28px;
+      white-space: nowrap;
+      transition: opacity .15s, transform .1s;
+    }
+
+    .btn:hover  { opacity: .88; }
+    .btn:active { transform: scale(.97); }
+    .btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+    /* ── Status bar ────────────────────────────────── */
+    .status {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      background: var(--grey);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      margin-top: 16px;
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .status.visible { display: flex; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .status.done   { border-color: var(--green); color: var(--green); }
+    .status.failed { border-color: var(--red);   color: var(--red); }
+
+    /* ── Results ───────────────────────────────────── */
+    #results { padding-bottom: 80px; }
+
+    .results-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .results-title {
+      font-family: var(--font-display);
+      font-size: 28px;
+      letter-spacing: .04em;
+    }
+
+    .badge {
+      background: var(--accent);
+      color: var(--black);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      padding: 3px 10px;
+      border-radius: 20px;
+    }
+
+    /* ── Image grid ────────────────────────────────── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 2px;
+      margin-bottom: 32px;
+    }
+
+    .card {
+      background: var(--grey);
+      position: relative;
+      overflow: hidden;
+      aspect-ratio: 1;
+      cursor: pointer;
+    }
+
+    .card img {
+      width: 100%; height: 100%;
+      object-fit: contain;
+      display: block;
+      transition: transform .3s ease;
+      padding: 8px;
+    }
+
+    .card:hover img { transform: scale(1.05); }
+
+    .card-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity .2s;
+    }
+
+    .card:hover .card-overlay { opacity: 1; }
+
+    .card-dl {
+      background: var(--accent);
+      color: var(--black);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      padding: 8px 16px;
+      border-radius: 2px;
+      text-decoration: none;
+    }
+
+    /* ── Download all button ───────────────────────── */
+    .dl-all-wrap {
+      text-align: center;
+      margin-top: 8px;
+    }
+
+    .btn-dl-all {
+      background: transparent;
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      color: var(--accent);
+      cursor: pointer;
+      font-family: var(--font-display);
+      font-size: 20px;
+      letter-spacing: .08em;
+      padding: 16px 40px;
+      transition: background .2s, color .2s;
+      width: 100%;
+      max-width: 400px;
+    }
+
+    .btn-dl-all:hover {
+      background: var(--accent);
+      color: var(--black);
+    }
+
+    .btn-dl-all:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Progress bar ──────────────────────────────── */
+    .progress-wrap {
+      display: none;
+      margin-top: 16px;
+    }
+
+    .progress-wrap.visible { display: block; }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: var(--accent);
+      width: 0%;
+      transition: width .3s ease;
+    }
+
+    .progress-label {
+      font-size: 12px;
+      color: var(--text);
+      margin-top: 8px;
+      text-align: center;
+    }
+
+    /* ── Footer ────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 0;
+      color: var(--border);
+      font-size: 12px;
+      letter-spacing: .05em;
+      text-align: center;
+    }
+
+    /* ── Responsive ────────────────────────────────── */
+    @media (max-width: 560px) {
+      .input-row { flex-direction: column; }
+      .grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="logo-row">
+      <svg class="swoosh" viewBox="0 0 85 30" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.76 23.59C5.5 24.5 2.56 24.22.83 22.7c-1.88-1.66-1.48-5.15.88-8.29C3.5 12.2 6.14 10.18 8.5 8.5L68.3 0 8.76 23.59z"/>
+      </svg>
+      <h1>IMAGE<span>GRAB</span></h1>
+    </div>
+    <p class="subtitle">Téléchargeur d'images Nike — Qualité maximale · Résolution native</p>
+  </header>
+
+  <!-- Input -->
+  <section class="input-section">
+    <label class="label" for="url-input">Lien du produit Nike</label>
+    <div class="input-row">
+      <input
+        type="url"
+        id="url-input"
+        placeholder="https://www.nike.com/t/..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="btn" id="scan-btn" onclick="scan()">ANALYSER</button>
+    </div>
+    <div class="status" id="status">
+      <div class="spinner" id="spinner"></div>
+      <span id="status-text">Analyse en cours…</span>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="results" style="display:none">
+    <div class="results-header">
+      <span class="results-title">IMAGES DÉTECTÉES</span>
+      <span class="badge" id="count-badge">0</span>
+    </div>
+
+    <div class="grid" id="image-grid"></div>
+
+    <div class="dl-all-wrap">
+      <button class="btn-dl-all" id="dl-all-btn" onclick="downloadAll()">
+        ↓ TOUT TÉLÉCHARGER EN ZIP
+      </button>
+      <div class="progress-wrap" id="progress-wrap">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+        <p class="progress-label" id="progress-label">Préparation du ZIP…</p>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">Nike Image Downloader — Usage personnel uniquement</div>
+  </footer>
+
+</div>
+
+<script>
+  // ⚠️ Remplace cette URL par celle de ton backend Railway après déploiement
+  const API_BASE = "https://nike-downloader-production.up.railway.app";
+
+  let currentStyleColor = "";
+  let currentUrl = "";
+
+  function setStatus(msg, type = "loading") {
+    const el   = document.getElementById("status");
+    const txt  = document.getElementById("status-text");
+    const spin = document.getElementById("spinner");
+
+    el.className = "status visible";
+    txt.textContent = msg;
+    spin.style.display = type === "loading" ? "block" : "none";
+
+    if (type === "done")   el.classList.add("done");
+    if (type === "failed") el.classList.add("failed");
+  }
+
+  function hideStatus() {
+    document.getElementById("status").className = "status";
+  }
+
+  async function scan() {
+    const url = document.getElementById("url-input").value.trim();
+    if (!url || !url.includes("nike.com")) {
+      setStatus("❌ L'URL doit provenir de nike.com", "failed");
+      return;
+    }
+
+    currentUrl = url;
+    document.getElementById("scan-btn").disabled = true;
+    document.getElementById("results").style.display = "none";
+    setStatus("Analyse de la page Nike en cours…");
+
+    try {
+      const res  = await fetch(`${API_BASE}/api/scan`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ url }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) throw new Error(data.error || "Erreur serveur");
+      if (data.count === 0) {
+        setStatus("Aucune image produit trouvée sur cette page.", "failed");
+        return;
+      }
+
+      currentStyleColor = data.style_color;
+      renderResults(data);
+      setStatus(`✔ ${data.count} image(s) détectée(s) — ${data.style_color}`, "done");
+
+    } catch (e) {
+      setStatus(`❌ ${e.message}`, "failed");
+    } finally {
+      document.getElementById("scan-btn").disabled = false;
+    }
+  }
+
+  function renderResults(data) {
+    const grid = document.getElementById("image-grid");
+    grid.innerHTML = "";
+    document.getElementById("count-badge").textContent = data.count;
+
+    data.images.forEach((img, i) => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.innerHTML = `
+        <img src="${img.preview}" alt="Nike image ${i+1}" loading="lazy" />
+        <div class="card-overlay">
+          <a class="card-dl" href="${img.download}" download target="_blank">↓ DL</a>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    document.getElementById("results").style.display = "block";
+    document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+  }
+
+  async function downloadAll() {
+    if (!currentUrl) return;
+
+    const btn      = document.getElementById("dl-all-btn");
+    const progress = document.getElementById("progress-wrap");
+    const fill     = document.getElementById("progress-fill");
+    const label    = document.getElementById("progress-label");
+
+    btn.disabled = true;
+    progress.className = "progress-wrap visible";
+    label.textContent  = "Téléchargement en cours… (peut prendre 30–60s)";
+
+    // Animation de progression simulée (le ZIP se construit côté serveur)
+    let pct = 0;
+    const ticker = setInterval(() => {
+      pct = Math.min(pct + Math.random() * 4, 88);
+      fill.style.width = pct + "%";
+    }, 500);
+
+    try {
+      const res = await fetch(`${API_BASE}/api/download`, {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ url: currentUrl, style_color: currentStyleColor }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Erreur lors du téléchargement");
+      }
+
+      clearInterval(ticker);
+      fill.style.width   = "100%";
+      label.textContent  = "✔ ZIP prêt — téléchargement…";
+
+      // Déclencher le téléchargement
+      const blob = await res.blob();
+      const dlUrl = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href     = dlUrl;
+      a.download = `nike_${currentStyleColor}.zip`;
+      a.click();
+      URL.revokeObjectURL(dlUrl);
+
+      setTimeout(() => {
+        progress.className = "progress-wrap";
+        fill.style.width   = "0%";
+        btn.disabled       = false;
+      }, 3000);
+
+    } catch (e) {
+      clearInterval(ticker);
+      label.textContent  = `❌ ${e.message}`;
+      fill.style.width   = "0%";
+      setTimeout(() => {
+        progress.className = "progress-wrap";
+        btn.disabled       = false;
+      }, 3000);
+    }
+  }
+
+  // Lancer l'analyse avec Entrée
+  document.getElementById("url-input").addEventListener("keydown", e => {
+    if (e.key === "Enter") scan();
+  });
+</script>
+
+</body>
+</html>
